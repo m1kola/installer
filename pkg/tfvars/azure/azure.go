@@ -22,27 +22,28 @@ type Auth struct {
 }
 
 type config struct {
-	Auth                        `json:",inline"`
-	Environment                 string            `json:"azure_environment"`
-	ARMEndpoint                 string            `json:"azure_arm_endpoint,omitempty"`
-	ExtraTags                   map[string]string `json:"azure_extra_tags,omitempty"`
-	BootstrapInstanceType       string            `json:"azure_bootstrap_vm_type,omitempty"`
-	MasterInstanceType          string            `json:"azure_master_vm_type,omitempty"`
-	MasterAvailabilityZones     []string          `json:"azure_master_availability_zones"`
-	MasterDiskEncryptionSetID   string            `json:"azure_master_disk_encryption_set_id,omitempty"`
-	VolumeType                  string            `json:"azure_master_root_volume_type"`
-	VolumeSize                  int32             `json:"azure_master_root_volume_size"`
-	ImageURL                    string            `json:"azure_image_url,omitempty"`
-	Region                      string            `json:"azure_region,omitempty"`
-	BaseDomainResourceGroupName string            `json:"azure_base_domain_resource_group_name,omitempty"`
-	ResourceGroupName           string            `json:"azure_resource_group_name"`
-	NetworkResourceGroupName    string            `json:"azure_network_resource_group_name"`
-	VirtualNetwork              string            `json:"azure_virtual_network"`
-	ControlPlaneSubnet          string            `json:"azure_control_plane_subnet"`
-	ComputeSubnet               string            `json:"azure_compute_subnet"`
-	PreexistingNetwork          bool              `json:"azure_preexisting_network"`
-	Private                     bool              `json:"azure_private"`
-	OutboundUDR                 bool              `json:"azure_outbound_user_defined_routing"`
+	Auth                          `json:",inline"`
+	Environment                   string            `json:"azure_environment"`
+	ARMEndpoint                   string            `json:"azure_arm_endpoint,omitempty"`
+	ExtraTags                     map[string]string `json:"azure_extra_tags,omitempty"`
+	BootstrapInstanceType         string            `json:"azure_bootstrap_vm_type,omitempty"`
+	MasterInstanceType            string            `json:"azure_master_vm_type,omitempty"`
+	MasterAvailabilityZones       []string          `json:"azure_master_availability_zones"`
+	MasterEncryptionAtHostEnabled bool              `json:"azure_master_encryption_at_host_enabled,omitempty"`
+	MasterDiskEncryptionSetID     string            `json:"azure_master_disk_encryption_set_id,omitempty"`
+	VolumeType                    string            `json:"azure_master_root_volume_type"`
+	VolumeSize                    int32             `json:"azure_master_root_volume_size"`
+	ImageURL                      string            `json:"azure_image_url,omitempty"`
+	Region                        string            `json:"azure_region,omitempty"`
+	BaseDomainResourceGroupName   string            `json:"azure_base_domain_resource_group_name,omitempty"`
+	ResourceGroupName             string            `json:"azure_resource_group_name"`
+	NetworkResourceGroupName      string            `json:"azure_network_resource_group_name"`
+	VirtualNetwork                string            `json:"azure_virtual_network"`
+	ControlPlaneSubnet            string            `json:"azure_control_plane_subnet"`
+	ComputeSubnet                 string            `json:"azure_compute_subnet"`
+	PreexistingNetwork            bool              `json:"azure_preexisting_network"`
+	Private                       bool              `json:"azure_private"`
+	OutboundUDR                   bool              `json:"azure_outbound_user_defined_routing"`
 }
 
 // TFVarsSources contains the parameters to be converted into Terraform variables
@@ -77,32 +78,37 @@ func TFVars(sources TFVarsSources) ([]byte, error) {
 		return nil, errors.Wrap(err, "could not determine Azure environment to use for Terraform")
 	}
 
+	masterEncryptionAtHostEnabled := masterConfig.SecurityProfile != nil &&
+		(*masterConfig.SecurityProfile).EncryptionAtHost != nil &&
+		*masterConfig.SecurityProfile.EncryptionAtHost
+
 	var masterDiskEncryptionSetID string
 	if masterConfig.OSDisk.ManagedDisk.DiskEncryptionSet != nil {
 		masterDiskEncryptionSetID = masterConfig.OSDisk.ManagedDisk.DiskEncryptionSet.ID
 	}
 
 	cfg := &config{
-		Auth:                        sources.Auth,
-		Environment:                 environment,
-		ARMEndpoint:                 sources.ARMEndpoint,
-		Region:                      region,
-		BootstrapInstanceType:       defaults.BootstrapInstanceType(sources.CloudName, region),
-		MasterInstanceType:          masterConfig.VMSize,
-		MasterAvailabilityZones:     masterAvailabilityZones,
-		MasterDiskEncryptionSetID:   masterDiskEncryptionSetID,
-		VolumeType:                  masterConfig.OSDisk.ManagedDisk.StorageAccountType,
-		VolumeSize:                  masterConfig.OSDisk.DiskSizeGB,
-		ImageURL:                    sources.ImageURL,
-		Private:                     sources.Publish == types.InternalPublishingStrategy,
-		OutboundUDR:                 sources.OutboundType == azure.UserDefinedRoutingOutboundType,
-		ResourceGroupName:           sources.ResourceGroupName,
-		BaseDomainResourceGroupName: sources.BaseDomainResourceGroupName,
-		NetworkResourceGroupName:    masterConfig.NetworkResourceGroup,
-		VirtualNetwork:              masterConfig.Vnet,
-		ControlPlaneSubnet:          masterConfig.Subnet,
-		ComputeSubnet:               workerConfig.Subnet,
-		PreexistingNetwork:          sources.PreexistingNetwork,
+		Auth:                          sources.Auth,
+		Environment:                   environment,
+		ARMEndpoint:                   sources.ARMEndpoint,
+		Region:                        region,
+		BootstrapInstanceType:         defaults.BootstrapInstanceType(sources.CloudName, region),
+		MasterInstanceType:            masterConfig.VMSize,
+		MasterAvailabilityZones:       masterAvailabilityZones,
+		MasterEncryptionAtHostEnabled: masterEncryptionAtHostEnabled,
+		MasterDiskEncryptionSetID:     masterDiskEncryptionSetID,
+		VolumeType:                    masterConfig.OSDisk.ManagedDisk.StorageAccountType,
+		VolumeSize:                    masterConfig.OSDisk.DiskSizeGB,
+		ImageURL:                      sources.ImageURL,
+		Private:                       sources.Publish == types.InternalPublishingStrategy,
+		OutboundUDR:                   sources.OutboundType == azure.UserDefinedRoutingOutboundType,
+		ResourceGroupName:             sources.ResourceGroupName,
+		BaseDomainResourceGroupName:   sources.BaseDomainResourceGroupName,
+		NetworkResourceGroupName:      masterConfig.NetworkResourceGroup,
+		VirtualNetwork:                masterConfig.Vnet,
+		ControlPlaneSubnet:            masterConfig.Subnet,
+		ComputeSubnet:                 workerConfig.Subnet,
+		PreexistingNetwork:            sources.PreexistingNetwork,
 	}
 
 	return json.MarshalIndent(cfg, "", "  ")
