@@ -106,6 +106,13 @@ func provider(platform *azure.Platform, mpool *azure.MachinePool, osImage string
 		managedIdentity = ""
 	}
 
+	var diskEncryptionSet *azureprovider.DiskEncryptionSetParameters
+	if mpool.OSDisk.DiskEncryptionSetID != "" {
+		diskEncryptionSet = &azureprovider.DiskEncryptionSetParameters{
+			ID: mpool.OSDisk.DiskEncryptionSetID,
+		}
+	}
+
 	return &azureprovider.AzureMachineProviderSpec{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "azureproviderconfig.openshift.io/v1beta1",
@@ -123,6 +130,7 @@ func provider(platform *azure.Platform, mpool *azure.MachinePool, osImage string
 			DiskSizeGB: mpool.OSDisk.DiskSizeGB,
 			ManagedDisk: azureprovider.ManagedDiskParameters{
 				StorageAccountType: mpool.OSDisk.DiskType,
+				DiskEncryptionSet:  diskEncryptionSet,
 			},
 		},
 		Zone:                 az,
